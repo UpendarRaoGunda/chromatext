@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chroma Text — colorful text generator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,800&family=Inter+Tight:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0d0e10; --panel:#16181c; --panel-2:#1d2026; --line:#2a2e36;
+    --ink:#f2f1ec; --muted:#8b8f98; --accent:#d7ff3f;
+    --radius:14px;
+  }
+  *{box-sizing:border-box; margin:0; padding:0}
+  html,body{height:100%}
+  body{
+    background:var(--bg); color:var(--ink);
+    font-family:'Inter Tight',system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:980px; margin:0 auto; padding:28px 20px 80px}
+
+  header{display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin-bottom:34px}
+  .brand{font-family:'Fraunces',serif; font-weight:800; font-size:1.35rem; letter-spacing:-.01em}
+  .brand em{font-style:normal; color:var(--accent)}
+  .api-pill{font-family:'JetBrains Mono',monospace; font-size:.72rem; color:var(--muted);
+    border:1px solid var(--line); padding:5px 10px; border-radius:99px}
+  .api-pill b{color:var(--accent); font-weight:500}
+
+  /* hero = the live preview itself */
+  .stage{
+    background:var(--panel); border:1px solid var(--line); border-radius:var(--radius);
+    padding:44px 32px; min-height:190px; display:flex; align-items:center; justify-content:center;
+    text-align:center; overflow-wrap:anywhere; position:relative;
+  }
+  .stage .out{
+    font-family:'Fraunces',serif; font-weight:800; letter-spacing:-.015em;
+    font-size:clamp(1.7rem, 5.4vw, 3.4rem); line-height:1.18; white-space:pre-wrap;
+  }
+  .stage .hint{color:var(--muted); font-size:1rem; font-family:'Inter Tight'}
+  .stage .status{position:absolute; top:12px; right:16px; font-family:'JetBrains Mono',monospace;
+    font-size:.68rem; color:var(--muted); opacity:0; transition:opacity .2s}
+  .stage .status.on{opacity:1}
+
+  textarea{
+    width:100%; margin-top:16px; background:var(--panel); color:var(--ink);
+    border:1px solid var(--line); border-radius:var(--radius); padding:16px 18px;
+    font-family:'Inter Tight'; font-size:1.05rem; resize:vertical; min-height:74px;
+  }
+  textarea:focus{outline:2px solid var(--accent); outline-offset:1px; border-color:transparent}
+
+  .controls{margin-top:22px; display:grid; gap:18px}
+  .row{display:flex; flex-wrap:wrap; gap:8px; align-items:center}
+  .label{font-family:'JetBrains Mono',monospace; font-size:.7rem; text-transform:uppercase;
+    letter-spacing:.12em; color:var(--muted); width:100%; margin-bottom:2px}
+
+  .chip{
+    background:var(--panel-2); border:1px solid var(--line); color:var(--ink);
+    padding:8px 15px; border-radius:99px; font-family:'Inter Tight'; font-weight:500;
+    font-size:.9rem; cursor:pointer; transition:border-color .15s, color .15s;
+  }
+  .chip:hover{border-color:var(--muted)}
+  .chip[aria-pressed="true"]{background:var(--accent); border-color:var(--accent); color:#0d0e10}
+  .chip:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+
+  .swatch{display:flex; align-items:center; gap:8px}
+  .swatch .dots{display:flex}
+  .swatch .dots i{width:13px; height:13px; border-radius:50%; margin-left:-4px; border:1.5px solid var(--panel-2)}
+  .swatch .dots i:first-child{margin-left:0}
+
+  .grad-pickers{display:none; gap:10px; align-items:center}
+  .grad-pickers.on{display:flex}
+  .grad-pickers input[type=color]{width:38px; height:38px; border:none; border-radius:9px;
+    background:none; cursor:pointer; padding:0}
+  .grad-pickers .plus{font-size:1.1rem}
+
+  .actions{margin-top:26px; display:flex; flex-wrap:wrap; gap:10px}
+  .btn{
+    font-family:'Inter Tight'; font-weight:600; font-size:.92rem; cursor:pointer;
+    padding:11px 20px; border-radius:99px; border:1px solid var(--line);
+    background:var(--panel-2); color:var(--ink); transition:transform .1s;
+  }
+  .btn:active{transform:scale(.97)}
+  .btn.primary{background:var(--accent); border-color:var(--accent); color:#0d0e10}
+  .btn:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+
+  .codebox{
+    margin-top:14px; background:#0a0b0d; border:1px solid var(--line); border-radius:var(--radius);
+    padding:16px; font-family:'JetBrains Mono',monospace; font-size:.78rem; color:#a8ffb0;
+    white-space:pre-wrap; word-break:break-all; max-height:180px; overflow:auto; display:none;
+  }
+  .codebox.on{display:block}
+
+  footer{margin-top:52px; color:var(--muted); font-size:.82rem; display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px}
+  footer code{font-family:'JetBrains Mono',monospace; font-size:.78rem}
+  @media (prefers-reduced-motion: reduce){ *{transition:none !important} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">chroma<em>·</em>text</div>
+    <div class="api-pill">colors computed by <b>/api/colorize</b></div>
+  </header>
+
+  <div class="stage" aria-live="polite">
+    <div class="status" id="status">rendering…</div>
+    <div class="out" id="out"><span class="hint">Type below — every color comes from the backend</span></div>
+  </div>
+
+  <textarea id="input" placeholder="Happy Birthday!" aria-label="Text to colorize">Happy Birthday!</textarea>
+
+  <div class="controls">
+    <div>
+      <div class="label">Mode</div>
+      <div class="row" id="modes" role="group" aria-label="Color mode">
+        <button class="chip" data-mode="rainbow" aria-pressed="true">Rainbow</button>
+        <button class="chip" data-mode="gradient" aria-pressed="false">Gradient</button>
+        <button class="chip" data-mode="palette" aria-pressed="false">Palette</button>
+        <button class="chip" data-mode="random" aria-pressed="false">Random</button>
+      </div>
+      <div class="grad-pickers" id="gradPickers" style="margin-top:10px">
+        <input type="color" value="#ff5e62" aria-label="Gradient start color">
+        <input type="color" value="#00c6ff" aria-label="Gradient end color">
+        <button class="chip plus" id="addStop" title="Add a third color">＋</button>
+      </div>
+    </div>
+
+    <div id="paletteBlock" style="display:none">
+      <div class="label">Palette</div>
+      <div class="row" id="palettes" role="group" aria-label="Palette"></div>
+    </div>
+
+    <div>
+      <div class="label">Apply per</div>
+      <div class="row" id="scopes" role="group" aria-label="Scope">
+        <button class="chip" data-scope="letter" aria-pressed="true">Letter</button>
+        <button class="chip" data-scope="word" aria-pressed="false">Word</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn primary" id="copyHtml">Copy as HTML</button>
+    <button class="btn" id="showHtml">Show HTML</button>
+    <button class="btn" id="downloadPng">Download PNG</button>
+    <button class="btn" id="shuffle" style="display:none">Shuffle colors</button>
+  </div>
+  <div class="codebox" id="codebox"></div>
+
+  <footer>
+    <span>Paste the copied HTML into Gmail, Docs, Notion, or any editor that accepts rich text.</span>
+    <span><code>POST /api/colorize</code></span>
+  </footer>
+</div>
+
+<script>
+const PALETTE_META = {
+  sunset:['#ff5e62','#ff9966','#ffcf5c'], ocean:['#00c6ff','#0072ff','#00e0d0'],
+  neon:['#39ff14','#ff2079','#04d9ff'], pastel:['#ffb3ba','#ffdfba','#baffc9'],
+  candy:['#ff6f91','#ffc75f','#d65db1'], fire:['#ff0000','#ff9e00','#ffce00'],
+  forest:['#2d6a4f','#52b788','#95d5b2'], festival:['#e63946','#e9c46a','#9b5de5'],
+};
+const state = { mode:'rainbow', scope:'letter', palette:'sunset', seed:null, last:null };
+const $ = s => document.querySelector(s);
+const out = $('#out'), input = $('#input'), status = $('#status'), codebox = $('#codebox');
+
+// build palette chips with color dots
+const palRow = $('#palettes');
+for (const [name, dots] of Object.entries(PALETTE_META)) {
+  const b = document.createElement('button');
+  b.className = 'chip swatch'; b.dataset.palette = name;
+  b.setAttribute('aria-pressed', name === state.palette);
+  b.innerHTML = `<span class="dots">${dots.map(c=>`<i style="background:${c}"></i>`).join('')}</span>${name}`;
+  palRow.appendChild(b);
+}
+
+function pressGroup(container, attr, value) {
+  container.querySelectorAll('.chip').forEach(c =>
+    c.setAttribute('aria-pressed', c.dataset[attr] === value));
+}
+
+$('#modes').addEventListener('click', e => {
+  const b = e.target.closest('[data-mode]'); if (!b) return;
+  state.mode = b.dataset.mode;
+  pressGroup($('#modes'), 'mode', state.mode);
+  $('#gradPickers').classList.toggle('on', state.mode === 'gradient');
+  $('#paletteBlock').style.display = (state.mode === 'palette' || state.mode === 'random') ? '' : 'none';
+  $('#shuffle').style.display = state.mode === 'random' ? '' : 'none';
+  state.seed = null;
+  render();
+});
+$('#palettes').addEventListener('click', e => {
+  const b = e.target.closest('[data-palette]'); if (!b) return;
+  state.palette = b.dataset.palette;
+  pressGroup($('#palettes'), 'palette', state.palette);
+  state.seed = null; render();
+});
+$('#scopes').addEventListener('click', e => {
+  const b = e.target.closest('[data-scope]'); if (!b) return;
+  state.scope = b.dataset.scope;
+  pressGroup($('#scopes'), 'scope', state.scope);
+  render();
+});
+$('#gradPickers').addEventListener('input', () => render());
+$('#addStop').addEventListener('click', () => {
+  const pickers = $('#gradPickers').querySelectorAll('input[type=color]');
+  if (pickers.length >= 5) return;
+  const c = document.createElement('input');
+  c.type = 'color'; c.value = '#d7ff3f'; c.setAttribute('aria-label','Gradient color');
+  $('#gradPickers').insertBefore(c, $('#addStop'));
+  render();
+});
+$('#shuffle').addEventListener('click', () => { state.seed = Math.floor(Math.random()*1e9); render(); });
+
+let timer, inflight = 0;
+input.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(render, 220); });
+
+async function render() {
+  const text = input.value;
+  if (!text.trim()) {
+    out.innerHTML = '<span class="hint">Type below — every color comes from the backend</span>';
+    return;
+  }
+  const stops = [...$('#gradPickers').querySelectorAll('input[type=color]')].map(i => i.value);
+  const body = { text, mode: state.mode, scope: state.scope, palette: state.palette,
+                 gradientStops: stops };
+  if (state.mode === 'random' && state.seed != null) body.seed = state.seed;
+
+  const id = ++inflight;
+  status.classList.add('on');
+  try {
+    const res = await fetch('/api/colorize', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (id !== inflight) return; // stale
+    if (data.error) { out.textContent = data.error; return; }
+    state.seed = data.seed; state.last = data;
+    out.innerHTML = data.html;
+    if (codebox.classList.contains('on')) codebox.textContent = data.html;
+  } catch {
+    out.innerHTML = '<span class="hint">Could not reach /api/colorize — is the backend running?</span>';
+  } finally {
+    if (id === inflight) status.classList.remove('on');
+  }
+}
+
+$('#copyHtml').addEventListener('click', async () => {
+  if (!state.last) return;
+  const html = state.last.html;
+  try {
+    await navigator.clipboard.write([new ClipboardItem({
+      'text/html': new Blob([html], { type: 'text/html' }),
+      'text/plain': new Blob([input.value], { type: 'text/plain' }),
+    })]);
+    flash($('#copyHtml'), 'Copied!');
+  } catch {
+    await navigator.clipboard.writeText(html);
+    flash($('#copyHtml'), 'Copied as code');
+  }
+});
+$('#showHtml').addEventListener('click', () => {
+  if (!state.last) return;
+  codebox.textContent = state.last.html;
+  codebox.classList.toggle('on');
+});
+$('#downloadPng').addEventListener('click', () => {
+  if (!state.last) return;
+  const spans = state.last.spans;
+  const fs = 64, pad = 40, font = `800 ${fs}px Fraunces, serif`;
+  const c = document.createElement('canvas'), g = c.getContext('2d');
+  g.font = font;
+  const lines = [[]];
+  for (const s of spans) {
+    if (s.t.includes('\n')) { s.t.split('\n').forEach((p,i)=>{ if(i>0) lines.push([]); if(p) lines[lines.length-1].push({t:p,c:s.c}); }); }
+    else lines[lines.length-1].push(s);
+  }
+  const widths = lines.map(l => l.reduce((w,s)=> w + g.measureText(s.t).width, 0));
+  c.width = Math.max(...widths, 10) + pad*2;
+  c.height = lines.length * fs * 1.3 + pad*2;
+  g.fillStyle = '#0d0e10'; g.fillRect(0,0,c.width,c.height);
+  g.font = font; g.textBaseline = 'top';
+  lines.forEach((line, li) => {
+    let x = pad;
+    for (const s of line) {
+      g.fillStyle = s.c || '#f2f1ec';
+      g.fillText(s.t, x, pad + li*fs*1.3);
+      x += g.measureText(s.t).width;
+    }
+  });
+  const a = document.createElement('a');
+  a.download = 'chroma-text.png'; a.href = c.toDataURL('image/png'); a.click();
+});
+
+function flash(btn, msg) {
+  const orig = btn.textContent; btn.textContent = msg;
+  setTimeout(() => btn.textContent = orig, 1200);
+}
+
+render();
+</script>
+</body>
+</html>

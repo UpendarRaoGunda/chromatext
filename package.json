@@ -1,0 +1,9 @@
+{
+  "name": "chroma-text",
+  "version": "1.0.0",
+  "description": "Colorful text generator — backend-driven colorization API + frontend",
+  "scripts": {
+    "dev": "vercel dev"
+  },
+  "license": "MIT"
+}

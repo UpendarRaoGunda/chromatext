@@ -1,0 +1,6 @@
+{
+  "version": 2,
+  "functions": {
+    "api/colorize.js": { "maxDuration": 10 }
+  }
+}
