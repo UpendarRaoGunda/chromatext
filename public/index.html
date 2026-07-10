@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Chroma Text — colorful text generator</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,800&family=Inter+Tight:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,800&family=Noto+Sans+Telugu:wght@600;800&family=Inter+Tight:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root{
     --bg:#0d0e10; --panel:#16181c; --panel-2:#1d2026; --line:#2a2e36;
@@ -36,8 +36,8 @@
     text-align:center; overflow-wrap:anywhere; position:relative;
   }
   .stage .out{
-    font-family:'Fraunces',serif; font-weight:800; letter-spacing:-.015em;
-    font-size:clamp(1.7rem, 5.4vw, 3.4rem); line-height:1.18; white-space:pre-wrap;
+    font-family:'Noto Sans Telugu','Fraunces',serif; font-weight:800; letter-spacing:-.015em;
+    font-size:clamp(1.7rem, 5.4vw, 3.4rem); line-height:1.35; white-space:pre-wrap;
   }
   .stage .hint{color:var(--muted); font-size:1rem; font-family:'Inter Tight'}
   .stage .status{position:absolute; top:12px; right:16px; font-family:'JetBrains Mono',monospace;
@@ -102,15 +102,15 @@
 <div class="wrap">
   <header>
     <div class="brand">chroma<em>·</em>text</div>
-    <div class="api-pill">colors computed by <b>/api/colorize</b></div>
+    <div class="api-pill">typed text → <b>/api/translate</b> → <b>/api/colorize</b></div>
   </header>
 
   <div class="stage" aria-live="polite">
     <div class="status" id="status">rendering…</div>
-    <div class="out" id="out"><span class="hint">Type below — every color comes from the backend</span></div>
+    <div class="out" id="out"><span class="hint">Type in English below — it shows up in Telugu here</span></div>
   </div>
 
-  <textarea id="input" placeholder="Happy Birthday!" aria-label="Text to colorize">Happy Birthday!</textarea>
+  <textarea id="input" placeholder="Happy Birthday!" aria-label="Text to translate and colorize">Happy Birthday!</textarea>
 
   <div class="controls">
     <div>
@@ -136,8 +136,8 @@
     <div>
       <div class="label">Apply per</div>
       <div class="row" id="scopes" role="group" aria-label="Scope">
-        <button class="chip" data-scope="letter" aria-pressed="true">Letter</button>
-        <button class="chip" data-scope="word" aria-pressed="false">Word</button>
+        <button class="chip" data-scope="letter" aria-pressed="false">Letter</button>
+        <button class="chip" data-scope="word" aria-pressed="true">Word</button>
       </div>
     </div>
   </div>
@@ -153,7 +153,7 @@
 
   <footer>
     <span>Paste the copied HTML into Gmail, Docs, Notion, or any editor that accepts rich text.</span>
-    <span><code>POST /api/colorize</code></span>
+    <span><code>POST /api/translate</code> → <code>POST /api/colorize</code></span>
   </footer>
 </div>
 
@@ -164,7 +164,7 @@ const PALETTE_META = {
   candy:['#ff6f91','#ffc75f','#d65db1'], fire:['#ff0000','#ff9e00','#ffce00'],
   forest:['#2d6a4f','#52b788','#95d5b2'], festival:['#e63946','#e9c46a','#9b5de5'],
 };
-const state = { mode:'rainbow', scope:'letter', palette:'sunset', seed:null, last:null };
+const state = { mode:'rainbow', scope:'word', palette:'sunset', seed:null, last:null, telugu:null };
 const $ = s => document.querySelector(s);
 const out = $('#out'), input = $('#input'), status = $('#status'), codebox = $('#codebox');
 
@@ -191,68 +191,101 @@ $('#modes').addEventListener('click', e => {
   $('#paletteBlock').style.display = (state.mode === 'palette' || state.mode === 'random') ? '' : 'none';
   $('#shuffle').style.display = state.mode === 'random' ? '' : 'none';
   state.seed = null;
-  render();
+  paintColors();
 });
 $('#palettes').addEventListener('click', e => {
   const b = e.target.closest('[data-palette]'); if (!b) return;
   state.palette = b.dataset.palette;
   pressGroup($('#palettes'), 'palette', state.palette);
-  state.seed = null; render();
+  state.seed = null; paintColors();
 });
 $('#scopes').addEventListener('click', e => {
   const b = e.target.closest('[data-scope]'); if (!b) return;
   state.scope = b.dataset.scope;
   pressGroup($('#scopes'), 'scope', state.scope);
-  render();
+  paintColors();
 });
-$('#gradPickers').addEventListener('input', () => render());
+$('#gradPickers').addEventListener('input', () => paintColors());
 $('#addStop').addEventListener('click', () => {
   const pickers = $('#gradPickers').querySelectorAll('input[type=color]');
   if (pickers.length >= 5) return;
   const c = document.createElement('input');
   c.type = 'color'; c.value = '#d7ff3f'; c.setAttribute('aria-label','Gradient color');
   $('#gradPickers').insertBefore(c, $('#addStop'));
-  render();
+  paintColors();
 });
-$('#shuffle').addEventListener('click', () => { state.seed = Math.floor(Math.random()*1e9); render(); });
+$('#shuffle').addEventListener('click', () => { state.seed = Math.floor(Math.random()*1e9); paintColors(); });
 
-let timer, inflight = 0;
-input.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(render, 220); });
+let debounceTimer, opId = 0;
+input.addEventListener('input', () => { clearTimeout(debounceTimer); debounceTimer = setTimeout(handleTextChange, 420); });
 
-async function render() {
-  const text = input.value;
-  if (!text.trim()) {
-    out.innerHTML = '<span class="hint">Type below — every color comes from the backend</span>';
+async function safeErr(res) {
+  try { const j = await res.json(); return 'HTTP ' + res.status + (j.error ? ' — ' + j.error : ''); }
+  catch { return 'HTTP ' + res.status; }
+}
+
+// Step 1: text changed → translate to Telugu (skipped server-side if the
+// text is already Telugu), then paint colors on the result.
+async function handleTextChange() {
+  const raw = input.value;
+  const id = ++opId;
+  if (!raw.trim()) {
+    state.telugu = null; state.last = null;
+    out.innerHTML = '<span class="hint">Type in English below — it shows up in Telugu here</span>';
     return;
   }
-  const stops = [...$('#gradPickers').querySelectorAll('input[type=color]')].map(i => i.value);
-  const body = { text, mode: state.mode, scope: state.scope, palette: state.palette,
-                 gradientStops: stops };
-  if (state.mode === 'random' && state.seed != null) body.seed = state.seed;
+  status.textContent = 'translating…'; status.classList.add('on');
+  try {
+    const res = await fetch('/api/translate', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: raw }),
+    });
+    if (id !== opId) return;
+    if (!res.ok) {
+      out.innerHTML = '<span class="hint">/api/translate failed: ' + (await safeErr(res)) + '</span>';
+      status.classList.remove('on');
+      return;
+    }
+    const data = await res.json();
+    if (id !== opId) return;
+    state.telugu = data.translated;
+    await paintColors(id);
+  } catch (e) {
+    if (id === opId) {
+      out.innerHTML = '<span class="hint">Could not reach /api/translate (' + e.message + '). If opened as a plain file, run <b>vercel dev</b> first.</span>';
+      status.classList.remove('on');
+    }
+  }
+}
 
-  const id = ++inflight;
-  status.classList.add('on');
+// Step 2: color the current Telugu text. Called on every text change AND on
+// every mode/scope/palette tweak — but only step 1 ever calls the
+// translator, so switching colors never re-hits the translation API.
+async function paintColors(id = ++opId) {
+  if (!state.telugu) return;
+  status.textContent = 'rendering…'; status.classList.add('on');
+  const stops = [...$('#gradPickers').querySelectorAll('input[type=color]')].map(i => i.value);
+  const body = { text: state.telugu, mode: state.mode, scope: state.scope, palette: state.palette, gradientStops: stops };
+  if (state.mode === 'random' && state.seed != null) body.seed = state.seed;
   try {
     const res = await fetch('/api/colorize', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
+    if (id !== opId) return;
     if (!res.ok) {
-      let msg = 'HTTP ' + res.status;
-      try { msg += ' — ' + ((await res.json()).error || ''); } catch {}
-      if (id === inflight) out.innerHTML = '<span class="hint">/api/colorize failed: ' + msg + '</span>';
+      out.innerHTML = '<span class="hint">/api/colorize failed: ' + (await safeErr(res)) + '</span>';
       return;
     }
     const data = await res.json();
-    if (id !== inflight) return; // stale
+    if (id !== opId) return;
     state.seed = data.seed; state.last = data;
     out.innerHTML = data.html;
     if (codebox.classList.contains('on')) codebox.textContent = data.html;
   } catch (e) {
-    if (id === inflight)
-      out.innerHTML = '<span class="hint">Could not reach /api/colorize (' + e.message + '). If opened as a plain file, run <b>vercel dev</b> — the backend must be running.</span>';
+    if (id === opId) out.innerHTML = '<span class="hint">Could not reach /api/colorize (' + e.message + ').</span>';
   } finally {
-    if (id === inflight) status.classList.remove('on');
+    if (id === opId) status.classList.remove('on');
   }
 }
 
@@ -262,7 +295,7 @@ $('#copyHtml').addEventListener('click', async () => {
   try {
     await navigator.clipboard.write([new ClipboardItem({
       'text/html': new Blob([html], { type: 'text/html' }),
-      'text/plain': new Blob([input.value], { type: 'text/plain' }),
+      'text/plain': new Blob([state.telugu || ''], { type: 'text/plain' }),
     })]);
     flash($('#copyHtml'), 'Copied!');
   } catch {
@@ -275,9 +308,11 @@ $('#showHtml').addEventListener('click', () => {
   codebox.textContent = state.last.html;
   codebox.classList.toggle('on');
 });
-function renderPng() {
+async function renderPng() {
+  await document.fonts.load('800 64px "Noto Sans Telugu"');
+  await document.fonts.ready;
   const spans = state.last.spans;
-  const fs = 64, pad = 40, font = `800 ${fs}px Fraunces, serif`;
+  const fs = 64, pad = 40, font = `800 ${fs}px "Noto Sans Telugu", Fraunces, serif`;
   const c = document.createElement('canvas'), g = c.getContext('2d');
   g.font = font;
   const lines = [[]];
@@ -301,29 +336,29 @@ function renderPng() {
   return c;
 }
 
-$('#downloadPng').addEventListener('click', () => {
+$('#downloadPng').addEventListener('click', async () => {
   if (!state.last) return;
   const a = document.createElement('a');
-  a.download = 'chroma-text.png'; a.href = renderPng().toDataURL('image/png'); a.click();
+  a.download = 'chroma-text.png'; a.href = (await renderPng()).toDataURL('image/png'); a.click();
 });
 
 $('#waShare').addEventListener('click', async () => {
   if (!state.last) return;
-  // Best path (mobile): share the colored PNG straight into WhatsApp
+  // Best path (mobile): share the colored Telugu PNG straight into WhatsApp
   try {
-    const blob = await new Promise(r => renderPng().toBlob(r, 'image/png'));
+    const blob = await new Promise(r => renderPng().then(c => c.toBlob(r, 'image/png')));
     const file = new File([blob], 'chroma-text.png', { type: 'image/png' });
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      await navigator.share({ files: [file], text: input.value });
+      await navigator.share({ files: [file], text: state.telugu || '' });
       return;
     }
   } catch (e) {
     if (e.name === 'AbortError') return; // user closed the share sheet
   }
-  // Fallback (desktop): wa.me — WhatsApp text can't hold colors, so send the
-  // plain text plus a link back to the app. Tip shown via button flash.
+  // Fallback (desktop): wa.me — plain WhatsApp text can't carry colors, so
+  // send the Telugu text plus a link back to the app.
   flash($('#waShare'), 'Opening WhatsApp…');
-  const msg = input.value + '\n\n🎨 ' + location.origin;
+  const msg = (state.telugu || '') + '\n\n🎨 ' + location.origin;
   window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank', 'noopener');
 });
 
@@ -332,7 +367,7 @@ function flash(btn, msg) {
   setTimeout(() => btn.textContent = orig, 1200);
 }
 
-render();
+handleTextChange();
 </script>
 </body>
 </html>

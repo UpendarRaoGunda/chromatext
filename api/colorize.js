@@ -70,7 +70,14 @@ function splitUnits(text, scope) {
       text: s, colorable: /\S/.test(s),
     }));
   }
-  // letter scope
+  // letter scope — use Unicode grapheme clusters (not raw code points).
+  // Telugu vowel signs and virama are separate code points that must stay
+  // attached to their base consonant to render as one visual character;
+  // splitting by code point tears them apart into broken marks.
+  if (typeof Intl !== 'undefined' && Intl.Segmenter) {
+    const seg = new Intl.Segmenter('te', { granularity: 'grapheme' });
+    return Array.from(seg.segment(text), s => ({ text: s.segment, colorable: /\S/.test(s.segment) }));
+  }
   return Array.from(text).map(ch => ({ text: ch, colorable: /\S/.test(ch) }));
 }
 
@@ -115,16 +122,7 @@ function toHtml(units) {
 }
 
 // ---------- handler ----------
-async function readBody(req) {
-  if (req.body !== undefined && req.body !== null) {
-    return typeof req.body === 'string' ? JSON.parse(req.body || '{}') : req.body;
-  }
-  // fallback: some runtimes don't pre-parse the body
-  const chunks = [];
-  for await (const chunk of req) chunks.push(chunk);
-  const raw = Buffer.concat(chunks).toString('utf8');
-  return raw ? JSON.parse(raw) : {};
-}
+const { readBody } = require('./_lib/http');
 
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
