@@ -144,15 +144,28 @@
         <button class="chip" data-scope="word" aria-pressed="false">Word</button>
       </div>
     </div>
+
+    <div>
+      <div class="label" id="translateLabel">Translate</div>
+      <div class="row" id="translateDir" role="group" aria-label="Translate direction">
+        <button class="chip" data-dir="en-te" aria-pressed="true">English → Telugu</button>
+        <button class="chip" data-dir="te-en" aria-pressed="false">Telugu → English</button>
+      </div>
+    </div>
   </div>
 
   <div class="actions">
     <button class="btn primary" id="copyHtml">Copy as HTML</button>
     <button class="btn" id="showHtml">Show HTML</button>
     <button class="btn" id="downloadPng">Download PNG</button>
+    <button class="btn" id="translateBtn">Translate text</button>
     <button class="btn" id="shuffle" style="display:none">Shuffle colors</button>
   </div>
   <div class="codebox" id="codebox"></div>
+  <div class="codebox" id="translateBox"></div>
+  <div class="actions" id="translateActions" style="display:none">
+    <button class="btn" id="useTranslation">Use this text</button>
+  </div>
 
   <footer>
     <span id="footerText">Paste the copied HTML into Gmail, Docs, Notion, or any editor that accepts rich text.</span>
@@ -184,6 +197,13 @@ const I18N = {
     footer: 'Paste the copied HTML into Gmail, Docs, Notion, or any editor that accepts rich text.',
     unreachable: 'Could not reach /api/colorize — is the backend running?',
     copied: 'Copied!', copiedCode: 'Copied as code',
+    translateLabel: 'Translate',
+    dirEnTe: 'English → Telugu', dirTeEn: 'Telugu → English',
+    translateBtn: 'Translate text', useTranslation: 'Use this text',
+    translating: 'Translating…',
+    translateError: 'Translation failed — try again.',
+    translateTooLong: 'Text is too long to translate (max 500 characters).',
+    translateEmpty: 'Type some text above first.',
   },
   te: {
     apiPill: 'రంగులు లెక్కించేది',
@@ -200,10 +220,18 @@ const I18N = {
     footer: 'కాపీ చేసిన HTMLని Gmail, Docs, Notion లేదా రిచ్ టెక్స్ట్ ఆమోదించే ఏ ఎడిటర్‌లోనైనా అతికించండి.',
     unreachable: '/api/colorize కు చేరుకోలేకపోయాము — బ్యాకెండ్ నడుస్తోందా?',
     copied: 'కాపీ అయ్యింది!', copiedCode: 'కోడ్‌గా కాపీ అయ్యింది',
+    translateLabel: 'అనువాదం',
+    dirEnTe: 'ఇంగ్లీష్ → తెలుగు', dirTeEn: 'తెలుగు → ఇంగ్లీష్',
+    translateBtn: 'టెక్స్ట్ అనువదించండి', useTranslation: 'ఈ టెక్స్ట్ ఉపయోగించండి',
+    translating: 'అనువదిస్తోంది…',
+    translateError: 'అనువాదం విఫలమైంది — మళ్ళీ ప్రయత్నించండి.',
+    translateTooLong: 'టెక్స్ట్ చాలా పొడవుగా ఉంది (గరిష్టం 500 అక్షరాలు).',
+    translateEmpty: 'ముందుగా పైన కొంత టెక్స్ట్ టైప్ చేయండి.',
   },
 };
 
-const state = { mode:'rainbow', scope:'letter', palette:'sunset', seed:null, last:null, lang:'en' };
+const state = { mode:'rainbow', scope:'letter', palette:'sunset', seed:null, last:null, lang:'en',
+                 translateDir:'en-te', translation:null };
 const $ = s => document.querySelector(s);
 const out = $('#out'), input = $('#input'), status = $('#status'), codebox = $('#codebox');
 
@@ -239,6 +267,11 @@ function applyLanguage(lang) {
   $('#showHtml').textContent = t.showHtml;
   $('#downloadPng').textContent = t.downloadPng;
   $('#shuffle').textContent = t.shuffle;
+  $('#translateLabel').textContent = t.translateLabel;
+  $('[data-dir="en-te"]').textContent = t.dirEnTe;
+  $('[data-dir="te-en"]').textContent = t.dirTeEn;
+  $('#translateBtn').textContent = t.translateBtn;
+  $('#useTranslation').textContent = t.useTranslation;
   if (!input.value.trim()) out.innerHTML = `<span class="hint">${t.hint}</span>`;
 }
 
@@ -246,6 +279,53 @@ $('#langRow').addEventListener('click', e => {
   const b = e.target.closest('[data-lang]'); if (!b) return;
   pressGroup($('#langRow'), 'lang', b.dataset.lang);
   applyLanguage(b.dataset.lang);
+});
+
+$('#translateDir').addEventListener('click', e => {
+  const b = e.target.closest('[data-dir]'); if (!b) return;
+  state.translateDir = b.dataset.dir;
+  pressGroup($('#translateDir'), 'dir', state.translateDir);
+});
+
+const translateBox = $('#translateBox'), translateActions = $('#translateActions');
+
+$('#translateBtn').addEventListener('click', async () => {
+  const t = I18N[state.lang];
+  const text = input.value;
+  if (!text.trim()) {
+    translateBox.textContent = t.translateEmpty;
+    translateBox.classList.add('on');
+    translateActions.style.display = 'none';
+    return;
+  }
+  if (text.length > 500) {
+    translateBox.textContent = t.translateTooLong;
+    translateBox.classList.add('on');
+    translateActions.style.display = 'none';
+    return;
+  }
+  translateBox.textContent = t.translating;
+  translateBox.classList.add('on');
+  translateActions.style.display = 'none';
+  try {
+    const res = await fetch('/api/translate', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, direction: state.translateDir }),
+    });
+    const data = await res.json();
+    if (data.error) { translateBox.textContent = data.error; return; }
+    state.translation = data.translated;
+    translateBox.textContent = data.translated;
+    translateActions.style.display = '';
+  } catch {
+    translateBox.textContent = t.translateError;
+  }
+});
+
+$('#useTranslation').addEventListener('click', () => {
+  if (!state.translation) return;
+  input.value = state.translation;
+  render();
 });
 
 function pressGroup(container, attr, value) {
