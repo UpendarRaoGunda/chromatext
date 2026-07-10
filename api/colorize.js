@@ -115,7 +115,18 @@ function toHtml(units) {
 }
 
 // ---------- handler ----------
-module.exports = (req, res) => {
+async function readBody(req) {
+  if (req.body !== undefined && req.body !== null) {
+    return typeof req.body === 'string' ? JSON.parse(req.body || '{}') : req.body;
+  }
+  // fallback: some runtimes don't pre-parse the body
+  const chunks = [];
+  for await (const chunk of req) chunks.push(chunk);
+  const raw = Buffer.concat(chunks).toString('utf8');
+  return raw ? JSON.parse(raw) : {};
+}
+
+module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -135,7 +146,7 @@ module.exports = (req, res) => {
   }
 
   try {
-    const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
+    const body = await readBody(req);
     const text = String(body.text || '');
     if (!text.trim()) return res.status(400).json({ error: 'text is required' });
     if (text.length > 5000) return res.status(400).json({ error: 'text too long (max 5000 chars)' });

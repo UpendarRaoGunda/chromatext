@@ -8,8 +8,7 @@ Colorful text generator. Type a sentence ("Happy Birthday!") and get every lette
 
 ```
 api/colorize.js     # serverless backend — all colorization logic
-api/translate.js    # serverless backend — English/Telugu translation (MyMemory API)
-public/index.html   # frontend — calls POST /api/colorize and POST /api/translate
+public/index.html   # frontend — calls POST /api/colorize
 vercel.json
 ```
 
@@ -29,17 +28,6 @@ vercel.json
 ```
 
 Returns `{ spans: [{t, c}], html, seed }`. `seed` makes random mode reproducible/shareable. `GET /api/colorize` lists available modes and palettes.
-
-`POST /api/translate`
-
-```json
-{
-  "text": "Happy Birthday!",
-  "direction": "en-te | te-en"
-}
-```
-
-Returns `{ translated, direction }`. The UI can also be switched between English and Telugu (chips at the top of the page).
 
 ## Run locally
 

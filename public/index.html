@@ -1,7 +1,8 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" translate="no" class="notranslate">
 <head>
 <meta charset="UTF-8">
+<meta name="google" content="notranslate">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Chroma Text — colorful text generator</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -101,13 +102,8 @@
 <div class="wrap">
   <header>
     <div class="brand">chroma<em>·</em>text</div>
-    <div class="api-pill"><span id="apiPillText">colors computed by</span> <b>/api/colorize</b></div>
+    <div class="api-pill">colors computed by <b>/api/colorize</b></div>
   </header>
-
-  <div class="row" id="langRow" role="group" aria-label="Language" style="margin-bottom:20px">
-    <button class="chip" data-lang="en" aria-pressed="true">English</button>
-    <button class="chip" data-lang="te" aria-pressed="false">తెలుగు</button>
-  </div>
 
   <div class="stage" aria-live="polite">
     <div class="status" id="status">rendering…</div>
@@ -118,7 +114,7 @@
 
   <div class="controls">
     <div>
-      <div class="label" id="modeLabel">Mode</div>
+      <div class="label">Mode</div>
       <div class="row" id="modes" role="group" aria-label="Color mode">
         <button class="chip" data-mode="rainbow" aria-pressed="true">Rainbow</button>
         <button class="chip" data-mode="gradient" aria-pressed="false">Gradient</button>
@@ -133,23 +129,15 @@
     </div>
 
     <div id="paletteBlock" style="display:none">
-      <div class="label" id="paletteLabel">Palette</div>
+      <div class="label">Palette</div>
       <div class="row" id="palettes" role="group" aria-label="Palette"></div>
     </div>
 
     <div>
-      <div class="label" id="scopeLabel">Apply per</div>
+      <div class="label">Apply per</div>
       <div class="row" id="scopes" role="group" aria-label="Scope">
         <button class="chip" data-scope="letter" aria-pressed="true">Letter</button>
         <button class="chip" data-scope="word" aria-pressed="false">Word</button>
-      </div>
-    </div>
-
-    <div>
-      <div class="label" id="translateLabel">Translate</div>
-      <div class="row" id="translateDir" role="group" aria-label="Translate direction">
-        <button class="chip" data-dir="en-te" aria-pressed="true">English → Telugu</button>
-        <button class="chip" data-dir="te-en" aria-pressed="false">Telugu → English</button>
       </div>
     </div>
   </div>
@@ -158,17 +146,13 @@
     <button class="btn primary" id="copyHtml">Copy as HTML</button>
     <button class="btn" id="showHtml">Show HTML</button>
     <button class="btn" id="downloadPng">Download PNG</button>
-    <button class="btn" id="translateBtn">Translate text</button>
+    <button class="btn" id="waShare" style="background:#25D366; border-color:#25D366; color:#0d0e10">Share on WhatsApp</button>
     <button class="btn" id="shuffle" style="display:none">Shuffle colors</button>
   </div>
   <div class="codebox" id="codebox"></div>
-  <div class="codebox" id="translateBox"></div>
-  <div class="actions" id="translateActions" style="display:none">
-    <button class="btn" id="useTranslation">Use this text</button>
-  </div>
 
   <footer>
-    <span id="footerText">Paste the copied HTML into Gmail, Docs, Notion, or any editor that accepts rich text.</span>
+    <span>Paste the copied HTML into Gmail, Docs, Notion, or any editor that accepts rich text.</span>
     <span><code>POST /api/colorize</code></span>
   </footer>
 </div>
@@ -180,153 +164,19 @@ const PALETTE_META = {
   candy:['#ff6f91','#ffc75f','#d65db1'], fire:['#ff0000','#ff9e00','#ffce00'],
   forest:['#2d6a4f','#52b788','#95d5b2'], festival:['#e63946','#e9c46a','#9b5de5'],
 };
-
-const I18N = {
-  en: {
-    apiPill: 'colors computed by',
-    hint: 'Type below — every color comes from the backend',
-    placeholder: 'Happy Birthday!',
-    modeLabel: 'Mode',
-    modes: { rainbow:'Rainbow', gradient:'Gradient', palette:'Palette', random:'Random' },
-    paletteLabel: 'Palette',
-    paletteNames: { sunset:'sunset', ocean:'ocean', neon:'neon', pastel:'pastel',
-      candy:'candy', fire:'fire', forest:'forest', festival:'festival' },
-    scopeLabel: 'Apply per',
-    scopes: { letter:'Letter', word:'Word' },
-    copyHtml: 'Copy as HTML', showHtml: 'Show HTML', downloadPng: 'Download PNG', shuffle: 'Shuffle colors',
-    footer: 'Paste the copied HTML into Gmail, Docs, Notion, or any editor that accepts rich text.',
-    unreachable: 'Could not reach /api/colorize — is the backend running?',
-    copied: 'Copied!', copiedCode: 'Copied as code',
-    translateLabel: 'Translate',
-    dirEnTe: 'English → Telugu', dirTeEn: 'Telugu → English',
-    translateBtn: 'Translate text', useTranslation: 'Use this text',
-    translating: 'Translating…',
-    translateError: 'Translation failed — try again.',
-    translateTooLong: 'Text is too long to translate (max 500 characters).',
-    translateEmpty: 'Type some text above first.',
-  },
-  te: {
-    apiPill: 'రంగులు లెక్కించేది',
-    hint: 'కింద టైప్ చేయండి — ప్రతి రంగు బ్యాకెండ్ నుండి వస్తుంది',
-    placeholder: 'జన్మదిన శుభాకాంక్షలు!',
-    modeLabel: 'మోడ్',
-    modes: { rainbow:'హరివిల్లు', gradient:'గ్రేడియంట్', palette:'పాలెట్', random:'యాదృచ్ఛికం' },
-    paletteLabel: 'పాలెట్',
-    paletteNames: { sunset:'సూర్యాస్తమయం', ocean:'సముద్రం', neon:'నియాన్', pastel:'పాస్టెల్',
-      candy:'క్యాండీ', fire:'అగ్ని', forest:'అడవి', festival:'పండుగ' },
-    scopeLabel: 'దీనికి వర్తించు',
-    scopes: { letter:'అక్షరం', word:'పదం' },
-    copyHtml: 'HTMLగా కాపీ చేయి', showHtml: 'HTML చూపించు', downloadPng: 'PNG డౌన్‌లోడ్ చేయి', shuffle: 'రంగులు కలపండి',
-    footer: 'కాపీ చేసిన HTMLని Gmail, Docs, Notion లేదా రిచ్ టెక్స్ట్ ఆమోదించే ఏ ఎడిటర్‌లోనైనా అతికించండి.',
-    unreachable: '/api/colorize కు చేరుకోలేకపోయాము — బ్యాకెండ్ నడుస్తోందా?',
-    copied: 'కాపీ అయ్యింది!', copiedCode: 'కోడ్‌గా కాపీ అయ్యింది',
-    translateLabel: 'అనువాదం',
-    dirEnTe: 'ఇంగ్లీష్ → తెలుగు', dirTeEn: 'తెలుగు → ఇంగ్లీష్',
-    translateBtn: 'టెక్స్ట్ అనువదించండి', useTranslation: 'ఈ టెక్స్ట్ ఉపయోగించండి',
-    translating: 'అనువదిస్తోంది…',
-    translateError: 'అనువాదం విఫలమైంది — మళ్ళీ ప్రయత్నించండి.',
-    translateTooLong: 'టెక్స్ట్ చాలా పొడవుగా ఉంది (గరిష్టం 500 అక్షరాలు).',
-    translateEmpty: 'ముందుగా పైన కొంత టెక్స్ట్ టైప్ చేయండి.',
-  },
-};
-
-const state = { mode:'rainbow', scope:'letter', palette:'sunset', seed:null, last:null, lang:'en',
-                 translateDir:'en-te', translation:null };
+const state = { mode:'rainbow', scope:'letter', palette:'sunset', seed:null, last:null };
 const $ = s => document.querySelector(s);
 const out = $('#out'), input = $('#input'), status = $('#status'), codebox = $('#codebox');
 
-// build palette chips with color dots, labelled in the current language
+// build palette chips with color dots
 const palRow = $('#palettes');
-function renderPaletteChips() {
-  const names = I18N[state.lang].paletteNames;
-  palRow.innerHTML = '';
-  for (const [name, dots] of Object.entries(PALETTE_META)) {
-    const b = document.createElement('button');
-    b.className = 'chip swatch'; b.dataset.palette = name;
-    b.setAttribute('aria-pressed', name === state.palette);
-    b.innerHTML = `<span class="dots">${dots.map(c=>`<i style="background:${c}"></i>`).join('')}</span>${names[name]}`;
-    palRow.appendChild(b);
-  }
+for (const [name, dots] of Object.entries(PALETTE_META)) {
+  const b = document.createElement('button');
+  b.className = 'chip swatch'; b.dataset.palette = name;
+  b.setAttribute('aria-pressed', name === state.palette);
+  b.innerHTML = `<span class="dots">${dots.map(c=>`<i style="background:${c}"></i>`).join('')}</span>${name}`;
+  palRow.appendChild(b);
 }
-renderPaletteChips();
-
-function applyLanguage(lang) {
-  state.lang = lang;
-  const t = I18N[lang];
-  document.documentElement.lang = lang;
-  $('#apiPillText').textContent = t.apiPill;
-  input.placeholder = t.placeholder;
-  $('#modeLabel').textContent = t.modeLabel;
-  $('#paletteLabel').textContent = t.paletteLabel;
-  $('#scopeLabel').textContent = t.scopeLabel;
-  $('#footerText').textContent = t.footer;
-  document.querySelectorAll('#modes [data-mode]').forEach(b => b.textContent = t.modes[b.dataset.mode]);
-  document.querySelectorAll('#scopes [data-scope]').forEach(b => b.textContent = t.scopes[b.dataset.scope]);
-  renderPaletteChips();
-  $('#copyHtml').textContent = t.copyHtml;
-  $('#showHtml').textContent = t.showHtml;
-  $('#downloadPng').textContent = t.downloadPng;
-  $('#shuffle').textContent = t.shuffle;
-  $('#translateLabel').textContent = t.translateLabel;
-  $('[data-dir="en-te"]').textContent = t.dirEnTe;
-  $('[data-dir="te-en"]').textContent = t.dirTeEn;
-  $('#translateBtn').textContent = t.translateBtn;
-  $('#useTranslation').textContent = t.useTranslation;
-  if (!input.value.trim()) out.innerHTML = `<span class="hint">${t.hint}</span>`;
-}
-
-$('#langRow').addEventListener('click', e => {
-  const b = e.target.closest('[data-lang]'); if (!b) return;
-  pressGroup($('#langRow'), 'lang', b.dataset.lang);
-  applyLanguage(b.dataset.lang);
-});
-
-$('#translateDir').addEventListener('click', e => {
-  const b = e.target.closest('[data-dir]'); if (!b) return;
-  state.translateDir = b.dataset.dir;
-  pressGroup($('#translateDir'), 'dir', state.translateDir);
-});
-
-const translateBox = $('#translateBox'), translateActions = $('#translateActions');
-
-$('#translateBtn').addEventListener('click', async () => {
-  const t = I18N[state.lang];
-  const text = input.value;
-  if (!text.trim()) {
-    translateBox.textContent = t.translateEmpty;
-    translateBox.classList.add('on');
-    translateActions.style.display = 'none';
-    return;
-  }
-  if (text.length > 500) {
-    translateBox.textContent = t.translateTooLong;
-    translateBox.classList.add('on');
-    translateActions.style.display = 'none';
-    return;
-  }
-  translateBox.textContent = t.translating;
-  translateBox.classList.add('on');
-  translateActions.style.display = 'none';
-  try {
-    const res = await fetch('/api/translate', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, direction: state.translateDir }),
-    });
-    const data = await res.json();
-    if (data.error) { translateBox.textContent = data.error; return; }
-    state.translation = data.translated;
-    translateBox.textContent = data.translated;
-    translateActions.style.display = '';
-  } catch {
-    translateBox.textContent = t.translateError;
-  }
-});
-
-$('#useTranslation').addEventListener('click', () => {
-  if (!state.translation) return;
-  input.value = state.translation;
-  render();
-});
 
 function pressGroup(container, attr, value) {
   container.querySelectorAll('.chip').forEach(c =>
@@ -372,7 +222,7 @@ input.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(
 async function render() {
   const text = input.value;
   if (!text.trim()) {
-    out.innerHTML = `<span class="hint">${I18N[state.lang].hint}</span>`;
+    out.innerHTML = '<span class="hint">Type below — every color comes from the backend</span>';
     return;
   }
   const stops = [...$('#gradPickers').querySelectorAll('input[type=color]')].map(i => i.value);
@@ -387,14 +237,20 @@ async function render() {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
+    if (!res.ok) {
+      let msg = 'HTTP ' + res.status;
+      try { msg += ' — ' + ((await res.json()).error || ''); } catch {}
+      if (id === inflight) out.innerHTML = '<span class="hint">/api/colorize failed: ' + msg + '</span>';
+      return;
+    }
     const data = await res.json();
     if (id !== inflight) return; // stale
-    if (data.error) { out.textContent = data.error; return; }
     state.seed = data.seed; state.last = data;
     out.innerHTML = data.html;
     if (codebox.classList.contains('on')) codebox.textContent = data.html;
-  } catch {
-    out.innerHTML = `<span class="hint">${I18N[state.lang].unreachable}</span>`;
+  } catch (e) {
+    if (id === inflight)
+      out.innerHTML = '<span class="hint">Could not reach /api/colorize (' + e.message + '). If opened as a plain file, run <b>vercel dev</b> — the backend must be running.</span>';
   } finally {
     if (id === inflight) status.classList.remove('on');
   }
@@ -408,10 +264,10 @@ $('#copyHtml').addEventListener('click', async () => {
       'text/html': new Blob([html], { type: 'text/html' }),
       'text/plain': new Blob([input.value], { type: 'text/plain' }),
     })]);
-    flash($('#copyHtml'), I18N[state.lang].copied);
+    flash($('#copyHtml'), 'Copied!');
   } catch {
     await navigator.clipboard.writeText(html);
-    flash($('#copyHtml'), I18N[state.lang].copiedCode);
+    flash($('#copyHtml'), 'Copied as code');
   }
 });
 $('#showHtml').addEventListener('click', () => {
@@ -419,8 +275,7 @@ $('#showHtml').addEventListener('click', () => {
   codebox.textContent = state.last.html;
   codebox.classList.toggle('on');
 });
-$('#downloadPng').addEventListener('click', () => {
-  if (!state.last) return;
+function renderPng() {
   const spans = state.last.spans;
   const fs = 64, pad = 40, font = `800 ${fs}px Fraunces, serif`;
   const c = document.createElement('canvas'), g = c.getContext('2d');
@@ -443,8 +298,33 @@ $('#downloadPng').addEventListener('click', () => {
       x += g.measureText(s.t).width;
     }
   });
+  return c;
+}
+
+$('#downloadPng').addEventListener('click', () => {
+  if (!state.last) return;
   const a = document.createElement('a');
-  a.download = 'chroma-text.png'; a.href = c.toDataURL('image/png'); a.click();
+  a.download = 'chroma-text.png'; a.href = renderPng().toDataURL('image/png'); a.click();
+});
+
+$('#waShare').addEventListener('click', async () => {
+  if (!state.last) return;
+  // Best path (mobile): share the colored PNG straight into WhatsApp
+  try {
+    const blob = await new Promise(r => renderPng().toBlob(r, 'image/png'));
+    const file = new File([blob], 'chroma-text.png', { type: 'image/png' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], text: input.value });
+      return;
+    }
+  } catch (e) {
+    if (e.name === 'AbortError') return; // user closed the share sheet
+  }
+  // Fallback (desktop): wa.me — WhatsApp text can't hold colors, so send the
+  // plain text plus a link back to the app. Tip shown via button flash.
+  flash($('#waShare'), 'Opening WhatsApp…');
+  const msg = input.value + '\n\n🎨 ' + location.origin;
+  window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank', 'noopener');
 });
 
 function flash(btn, msg) {
