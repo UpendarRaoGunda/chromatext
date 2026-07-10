@@ -101,8 +101,13 @@
 <div class="wrap">
   <header>
     <div class="brand">chroma<em>·</em>text</div>
-    <div class="api-pill">colors computed by <b>/api/colorize</b></div>
+    <div class="api-pill"><span id="apiPillText">colors computed by</span> <b>/api/colorize</b></div>
   </header>
+
+  <div class="row" id="langRow" role="group" aria-label="Language" style="margin-bottom:20px">
+    <button class="chip" data-lang="en" aria-pressed="true">English</button>
+    <button class="chip" data-lang="te" aria-pressed="false">తెలుగు</button>
+  </div>
 
   <div class="stage" aria-live="polite">
     <div class="status" id="status">rendering…</div>
@@ -113,7 +118,7 @@
 
   <div class="controls">
     <div>
-      <div class="label">Mode</div>
+      <div class="label" id="modeLabel">Mode</div>
       <div class="row" id="modes" role="group" aria-label="Color mode">
         <button class="chip" data-mode="rainbow" aria-pressed="true">Rainbow</button>
         <button class="chip" data-mode="gradient" aria-pressed="false">Gradient</button>
@@ -128,12 +133,12 @@
     </div>
 
     <div id="paletteBlock" style="display:none">
-      <div class="label">Palette</div>
+      <div class="label" id="paletteLabel">Palette</div>
       <div class="row" id="palettes" role="group" aria-label="Palette"></div>
     </div>
 
     <div>
-      <div class="label">Apply per</div>
+      <div class="label" id="scopeLabel">Apply per</div>
       <div class="row" id="scopes" role="group" aria-label="Scope">
         <button class="chip" data-scope="letter" aria-pressed="true">Letter</button>
         <button class="chip" data-scope="word" aria-pressed="false">Word</button>
@@ -150,7 +155,7 @@
   <div class="codebox" id="codebox"></div>
 
   <footer>
-    <span>Paste the copied HTML into Gmail, Docs, Notion, or any editor that accepts rich text.</span>
+    <span id="footerText">Paste the copied HTML into Gmail, Docs, Notion, or any editor that accepts rich text.</span>
     <span><code>POST /api/colorize</code></span>
   </footer>
 </div>
@@ -162,19 +167,86 @@ const PALETTE_META = {
   candy:['#ff6f91','#ffc75f','#d65db1'], fire:['#ff0000','#ff9e00','#ffce00'],
   forest:['#2d6a4f','#52b788','#95d5b2'], festival:['#e63946','#e9c46a','#9b5de5'],
 };
-const state = { mode:'rainbow', scope:'letter', palette:'sunset', seed:null, last:null };
+
+const I18N = {
+  en: {
+    apiPill: 'colors computed by',
+    hint: 'Type below — every color comes from the backend',
+    placeholder: 'Happy Birthday!',
+    modeLabel: 'Mode',
+    modes: { rainbow:'Rainbow', gradient:'Gradient', palette:'Palette', random:'Random' },
+    paletteLabel: 'Palette',
+    paletteNames: { sunset:'sunset', ocean:'ocean', neon:'neon', pastel:'pastel',
+      candy:'candy', fire:'fire', forest:'forest', festival:'festival' },
+    scopeLabel: 'Apply per',
+    scopes: { letter:'Letter', word:'Word' },
+    copyHtml: 'Copy as HTML', showHtml: 'Show HTML', downloadPng: 'Download PNG', shuffle: 'Shuffle colors',
+    footer: 'Paste the copied HTML into Gmail, Docs, Notion, or any editor that accepts rich text.',
+    unreachable: 'Could not reach /api/colorize — is the backend running?',
+    copied: 'Copied!', copiedCode: 'Copied as code',
+  },
+  te: {
+    apiPill: 'రంగులు లెక్కించేది',
+    hint: 'కింద టైప్ చేయండి — ప్రతి రంగు బ్యాకెండ్ నుండి వస్తుంది',
+    placeholder: 'జన్మదిన శుభాకాంక్షలు!',
+    modeLabel: 'మోడ్',
+    modes: { rainbow:'హరివిల్లు', gradient:'గ్రేడియంట్', palette:'పాలెట్', random:'యాదృచ్ఛికం' },
+    paletteLabel: 'పాలెట్',
+    paletteNames: { sunset:'సూర్యాస్తమయం', ocean:'సముద్రం', neon:'నియాన్', pastel:'పాస్టెల్',
+      candy:'క్యాండీ', fire:'అగ్ని', forest:'అడవి', festival:'పండుగ' },
+    scopeLabel: 'దీనికి వర్తించు',
+    scopes: { letter:'అక్షరం', word:'పదం' },
+    copyHtml: 'HTMLగా కాపీ చేయి', showHtml: 'HTML చూపించు', downloadPng: 'PNG డౌన్‌లోడ్ చేయి', shuffle: 'రంగులు కలపండి',
+    footer: 'కాపీ చేసిన HTMLని Gmail, Docs, Notion లేదా రిచ్ టెక్స్ట్ ఆమోదించే ఏ ఎడిటర్‌లోనైనా అతికించండి.',
+    unreachable: '/api/colorize కు చేరుకోలేకపోయాము — బ్యాకెండ్ నడుస్తోందా?',
+    copied: 'కాపీ అయ్యింది!', copiedCode: 'కోడ్‌గా కాపీ అయ్యింది',
+  },
+};
+
+const state = { mode:'rainbow', scope:'letter', palette:'sunset', seed:null, last:null, lang:'en' };
 const $ = s => document.querySelector(s);
 const out = $('#out'), input = $('#input'), status = $('#status'), codebox = $('#codebox');
 
-// build palette chips with color dots
+// build palette chips with color dots, labelled in the current language
 const palRow = $('#palettes');
-for (const [name, dots] of Object.entries(PALETTE_META)) {
-  const b = document.createElement('button');
-  b.className = 'chip swatch'; b.dataset.palette = name;
-  b.setAttribute('aria-pressed', name === state.palette);
-  b.innerHTML = `<span class="dots">${dots.map(c=>`<i style="background:${c}"></i>`).join('')}</span>${name}`;
-  palRow.appendChild(b);
+function renderPaletteChips() {
+  const names = I18N[state.lang].paletteNames;
+  palRow.innerHTML = '';
+  for (const [name, dots] of Object.entries(PALETTE_META)) {
+    const b = document.createElement('button');
+    b.className = 'chip swatch'; b.dataset.palette = name;
+    b.setAttribute('aria-pressed', name === state.palette);
+    b.innerHTML = `<span class="dots">${dots.map(c=>`<i style="background:${c}"></i>`).join('')}</span>${names[name]}`;
+    palRow.appendChild(b);
+  }
 }
+renderPaletteChips();
+
+function applyLanguage(lang) {
+  state.lang = lang;
+  const t = I18N[lang];
+  document.documentElement.lang = lang;
+  $('#apiPillText').textContent = t.apiPill;
+  input.placeholder = t.placeholder;
+  $('#modeLabel').textContent = t.modeLabel;
+  $('#paletteLabel').textContent = t.paletteLabel;
+  $('#scopeLabel').textContent = t.scopeLabel;
+  $('#footerText').textContent = t.footer;
+  document.querySelectorAll('#modes [data-mode]').forEach(b => b.textContent = t.modes[b.dataset.mode]);
+  document.querySelectorAll('#scopes [data-scope]').forEach(b => b.textContent = t.scopes[b.dataset.scope]);
+  renderPaletteChips();
+  $('#copyHtml').textContent = t.copyHtml;
+  $('#showHtml').textContent = t.showHtml;
+  $('#downloadPng').textContent = t.downloadPng;
+  $('#shuffle').textContent = t.shuffle;
+  if (!input.value.trim()) out.innerHTML = `<span class="hint">${t.hint}</span>`;
+}
+
+$('#langRow').addEventListener('click', e => {
+  const b = e.target.closest('[data-lang]'); if (!b) return;
+  pressGroup($('#langRow'), 'lang', b.dataset.lang);
+  applyLanguage(b.dataset.lang);
+});
 
 function pressGroup(container, attr, value) {
   container.querySelectorAll('.chip').forEach(c =>
@@ -220,7 +292,7 @@ input.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(
 async function render() {
   const text = input.value;
   if (!text.trim()) {
-    out.innerHTML = '<span class="hint">Type below — every color comes from the backend</span>';
+    out.innerHTML = `<span class="hint">${I18N[state.lang].hint}</span>`;
     return;
   }
   const stops = [...$('#gradPickers').querySelectorAll('input[type=color]')].map(i => i.value);
@@ -242,7 +314,7 @@ async function render() {
     out.innerHTML = data.html;
     if (codebox.classList.contains('on')) codebox.textContent = data.html;
   } catch {
-    out.innerHTML = '<span class="hint">Could not reach /api/colorize — is the backend running?</span>';
+    out.innerHTML = `<span class="hint">${I18N[state.lang].unreachable}</span>`;
   } finally {
     if (id === inflight) status.classList.remove('on');
   }
@@ -256,10 +328,10 @@ $('#copyHtml').addEventListener('click', async () => {
       'text/html': new Blob([html], { type: 'text/html' }),
       'text/plain': new Blob([input.value], { type: 'text/plain' }),
     })]);
-    flash($('#copyHtml'), 'Copied!');
+    flash($('#copyHtml'), I18N[state.lang].copied);
   } catch {
     await navigator.clipboard.writeText(html);
-    flash($('#copyHtml'), 'Copied as code');
+    flash($('#copyHtml'), I18N[state.lang].copiedCode);
   }
 });
 $('#showHtml').addEventListener('click', () => {
